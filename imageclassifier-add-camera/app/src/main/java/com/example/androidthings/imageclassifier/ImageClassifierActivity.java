@@ -19,9 +19,15 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.ImageReader;
+import android.media.MediaCodec;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
+import android.util.SparseIntArray;
 import android.view.KeyEvent;
+import android.view.Surface;
+import android.view.TextureView;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -41,7 +47,9 @@ import java.util.Iterator;
 import java.util.List;
 
 public class ImageClassifierActivity extends Activity {
-    private static final String TAG = "ImageClassifierActivity";
+    private static final String TAG = "SecurityActivity";
+
+
 
     /** Camera image capture size */
     private static final int PREVIEW_IMAGE_WIDTH = 640;
@@ -64,7 +72,10 @@ public class ImageClassifierActivity extends Activity {
 
     private Interpreter mTensorFlowLite;
     private List<String> mLabels;
+
     private CameraHandler mCameraHandler;
+    private HandlerThread mCameraThread;
+
     private ImagePreprocessor mImagePreprocessor;
 
     /**
@@ -124,6 +135,12 @@ public class ImageClassifierActivity extends Activity {
     private void initCamera() {
         mImagePreprocessor = new ImagePreprocessor(PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT,
                 TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT);
+
+        mCameraThread = new HandlerThread("Camera Background");
+        mCameraThread.start();
+
+        Handler cameraTask = new Handler(mCameraThread.getLooper());
+
         mCameraHandler = CameraHandler.getInstance();
         mCameraHandler.initializeCamera(this,
                 PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT, null,
@@ -134,6 +151,8 @@ public class ImageClassifierActivity extends Activity {
                         onPhotoReady(bitmap);
                     }
                 });
+
+        loadPreview();
     }
 
     /**
@@ -151,6 +170,10 @@ public class ImageClassifierActivity extends Activity {
         mCameraHandler.takePicture();
     }
 
+    private void loadPreview() {
+        mCameraHandler.takePreview();
+    }
+
 
 
     // --------------------------------------------------------------------------------------
@@ -163,7 +186,7 @@ public class ImageClassifierActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         setContentView(R.layout.activity_camera);
-        mImage = findViewById(R.id.imageView);
+        mImage = findViewById(R.id.texture);
         mResultText = findViewById(R.id.resultText);
 
         updateStatus(getString(R.string.initializing));

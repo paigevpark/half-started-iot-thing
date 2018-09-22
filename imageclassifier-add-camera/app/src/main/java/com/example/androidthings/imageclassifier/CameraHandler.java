@@ -29,18 +29,45 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.Size;
+import android.util.SparseIntArray;
+import android.view.Surface;
+import android.view.TextureView;
 
+import java.io.File;
 import java.util.Collections;
 
 public class CameraHandler {
     private static final String TAG = CameraHandler.class.getSimpleName();
 
+    private TextureView textureView;
+    private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+    static {
+        ORIENTATIONS.append(Surface.ROTATION_0, 90);
+        ORIENTATIONS.append(Surface.ROTATION_90, 0);
+        ORIENTATIONS.append(Surface.ROTATION_180, 270);
+        ORIENTATIONS.append(Surface.ROTATION_270, 180);
+    }
+
     private static final int MAX_IMAGES = 1;
     private CameraDevice mCameraDevice;
     private CameraCaptureSession mCaptureSession;
+    private String cameraId;
+
+    protected CaptureRequest captureRequest;
+    protected CaptureRequest.Builder captureRequestBuilder;
+    private Size imageDimension;
+    private ImageReader imageReader;
+    private File file;
+    private static final int REQUEST_CAMERA_PERMISSION = 200;
+    private boolean mFlashSupported;
+    private Handler mBackgroundHandler;
+    private HandlerThread mBackgroundThread;
+
+
     private boolean initialized;
 
     /**
@@ -104,6 +131,22 @@ public class CameraHandler {
      * Begin a still image capture
      */
     public void takePicture() {
+        if (mCameraDevice == null) {
+            Log.w(TAG, "Cannot capture image. Camera not initialized.");
+            return;
+        }
+        // Create a CameraCaptureSession for capturing still images.
+        try {
+            mCameraDevice.createCaptureSession(
+                    Collections.singletonList(mImageReader.getSurface()),
+                    mSessionCallback,
+                    null);
+        } catch (CameraAccessException cae) {
+            Log.e(TAG, "Cannot create camera capture session", cae);
+        }
+    }
+
+    public void takePreview() {
         if (mCameraDevice == null) {
             Log.w(TAG, "Cannot capture image. Camera not initialized.");
             return;
